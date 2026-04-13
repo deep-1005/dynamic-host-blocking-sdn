@@ -1,0 +1,19 @@
+# Dynamic Host Blocking System — SDN Mininet Project
+
+## Student Details
+- **Name:** Deeptha S
+- **SRN:** PES1UG24CS144
+- **Subject:** SDN Mininet-based Simulation (Orange Problem)
+
+---
+
+## Problem Statement
+Dynamically block hosts based on traffic behavior using an SDN controller.
+The Ryu controller monitors packet rate per host. If any host exceeds a
+threshold of 20 packets within a 30-second window, the controller
+automatically installs a DROP flow rule on the switch to block that host
+from sending any further traffic.
+
+---
+
+## Topology
