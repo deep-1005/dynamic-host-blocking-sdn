@@ -320,18 +320,6 @@ Expected:
 
 ---
 
-## Proof of Execution
-
-> Add screenshots here after running the demo.
-
-- [ ] `pingall` output — before attack (0% dropped)
-- [ ] Controller log — WARNING at 15 packets
-- [ ] Controller log — BLOCK event with `!!!` banner
-- [ ] `h3 ping -c 3 h1` — 100% packet loss
-- [ ] `h1 ping -c 5 h2` — 0% packet loss (same time h3 is blocked)
-- [ ] `ovs-ofctl dump-flows s1` — showing DROP rule
-- [ ] `ovs-ofctl dump-flows s1` run twice — showing `n_packets` increasing
-- [ ] iperf: h1 normal throughput vs h3 zero throughput
 
 ---
 
@@ -341,15 +329,6 @@ The current implementation counts all outgoing packets per host. In a flood scen
 
 ---
 
-## Evaluation Criteria Coverage
-
-| Component | Marks | What was demonstrated |
-|---|---|---|
-| Problem Understanding & Setup | 4 | Mininet SingleSwitchTopo, Ryu remote controller on port 6633, OpenFlow 1.3 |
-| SDN Logic & Flow Rule Implementation | 6 | `packet_in` handler, `eth_src` match, priority-200 DROP rule with empty action list, MAC learning, table-miss rule |
-| Functional Correctness | 6 | `pingall` before attack passes; flood triggers block; `dump-flows` shows DROP rule; blocked host gets 100% loss; normal hosts unaffected |
-| Performance Observation | 5 | iperf bandwidth (normal ~95 Mbps vs blocked 0 Mbps), ping latency ~1ms, `n_packets` counter on flow rules, port statistics |
-| Explanation & Validation | 4 | Two distinct test scenarios (Allowed vs Blocked, Normal vs Failure), regression check (h3 ping after block = 100% loss), 30s window reset mechanism |
 
 ---
 
