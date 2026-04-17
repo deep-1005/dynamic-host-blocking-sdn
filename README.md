@@ -1,51 +1,51 @@
-# Dynamic Host Blocking System — SDN Mininet Project
+Dynamic Host Blocking System using SDN (Mininet + Ryu)
+Student Details
+Name: Deeptha S
+SRN: PES1UG24CS144
+Subject: Computer Networks
+Problem Statement
 
-## Student Details
-- **Name:** Deeptha S
-- **SRN:** PES1UG24CS144
-- **Subject:** SDN Mininet-based Simulation (Orange Problem)
+Design and implement a system that dynamically detects and blocks malicious hosts based on abnormal traffic patterns using Software Defined Networking (SDN).
 
----
+The Ryu controller monitors packet rates per host. If a host exceeds a threshold of 20 packets within a 30-second window, the controller installs a DROP flow rule on the switch to prevent further communication.
 
-## Problem Statement
-Dynamically block hosts based on traffic behavior using an SDN controller.
-The Ryu controller monitors packet rate per host. If any host exceeds a
-threshold of 20 packets within a 30-second window, the controller
-automatically installs a DROP flow rule on the switch to block that host
-from sending any further traffic.
-
----
-
-## Topology
+Objectives
+Monitor network traffic in real time
+Detect abnormal (high-rate) traffic behavior
+Automatically mitigate attacks using SDN control logic
+Ensure unaffected hosts continue normal communication
+Network Topology
 h1 (10.0.0.1) ─┐
 h2 (10.0.0.2) ─┤
-s1 ──── Ryu Controller (port 6633)
+               s1 ─── Ryu Controller (port 6633)
 h3 (10.0.0.3) ─┤
 h4 (10.0.0.4) ─┘
-- 1 OVS switch, 4 hosts, 1 remote Ryu controller
-- OpenFlow 1.3
-
----
-
-## How It Works
-1. All packets are sent to the Ryu controller via a table-miss flow rule
-2. Controller counts packets per source MAC address
-3. If a host exceeds 20 packets → controller installs a DROP rule (priority 200)
-4. Blocked host cannot send any further traffic
-5. Packet counts reset every 30 seconds
-
----
-
-## Setup and Installation
-
-### Requirements
-- Ubuntu 20.04 / 22.04
-- Python 3.11
-- Mininet
-- Ryu Controller 4.34
-
-### Install Dependencies
-```bash
+Single Open vSwitch (s1)
+Four hosts (h1–h4)
+Remote Ryu controller
+OpenFlow 1.3 protocol
+System Design
+Traffic Handling
+Switch forwards all packets to controller (table-miss rule)
+Controller inspects each packet (Packet-In event)
+Packet count maintained per source MAC address
+Blocking Logic
+Threshold: 20 packets
+Monitoring window: 30 seconds
+If threshold exceeded:
+Install flow rule: match = eth_src
+Action: DROP
+Priority: 200
+Reset Mechanism
+Packet counters reset every 30 seconds
+Allows temporary spikes without permanent blocking
+Setup and Installation
+Requirements
+Ubuntu 20.04 / 22.04
+Python 3.11
+Mininet
+Ryu Controller 4.34
+Installation Steps
 sudo apt-get update
 sudo apt-get install -y python3.11 python3.11-venv mininet iperf wireshark
 
@@ -58,97 +58,126 @@ pip install eventlet==0.33.3
 pip install dnspython==2.6.1
 pip install ryu
 
-# Fix eventlet compatibility patch
+# Fix eventlet compatibility issue
 sed -i 's/from eventlet.wsgi import ALREADY_HANDLED/ALREADY_HANDLED = b""/' \
-    ~/ryu-project/venv/lib/python3.11/site-packages/ryu/app/wsgi.py
-```
-
-### Verify Ryu
-```bash
+~/ryu-project/venv/lib/python3.11/site-packages/ryu/app/wsgi.py
+Verify Installation
 ryu-manager --version
-# Expected: ryu-manager 4.34
-```
 
----
+Expected output:
 
-## Running the Project
-
-### Terminal 1 — Start Ryu Controller
-```bash
+ryu-manager 4.34
+Running the Project
+Terminal 1 — Start Controller
 cd ~/ryu-project
 source venv/bin/activate
 ryu-manager dynamic_blocker.py --verbose
-```
-
-### Terminal 2 — Start Mininet
-```bash
+Terminal 2 — Start Mininet
 sudo python3 ~/ryu-project/topology.py
-```
+Test Scenarios
+Scenario 1: Allowed vs Blocked Traffic
+Step 1 — Verify Connectivity
+mininet> pingall
 
----
+Expected result:
+All hosts reachable with 0% packet loss
 
-## Test Scenarios
+Step 2 — Check Flow Table (Before Attack)
+sudo ovs-ofctl -O OpenFlow13 dump-flows s1
+Step 3 — Simulate Flood Attack
+mininet> h3 ping -f h1 &
+Rapid packet generation triggers threshold
+Controller logs show packet count increasing
+Host gets blocked after threshold is exceeded
+Step 4 — Verify Blocked Host
+mininet> h3 ping -c 3 h1
 
-### Scenario 1 — Normal Traffic (should succeed)
-```bash
-mininet> h1 ping h2 -c 5
-```
-**Expected:** 5 packets transmitted, 5 received, 0% packet loss
+Expected result:
+100% packet loss
 
-### Scenario 2 — Flood Attack (host gets blocked)
-```bash
-mininet> h4 ping -i 0.2 -c 200 h1
-```
-**Expected:** Replies stop after ~20 packets. Controller logs:
-*** BLOCKED HOST: xx:xx:xx:xx exceeded 20 packets ***
+Step 5 — Verify Other Hosts
+mininet> h1 ping -c 5 h2
 
-### Verify Block Rule in Flow Table
-```bash
-mininet> sh ovs-ofctl dump-flows s1
-```
-**Expected:** Rule with `actions=drop` for h4's MAC address
+Expected result:
+0% packet loss
 
-### Verify Blocked Host Cannot Communicate
-```bash
-mininet> h4 ping h1 -c 3
-```
-**Expected:** 3 packets transmitted, 0 received, 100% packet loss
+Step 6 — Verify Flow Rule
+sudo ovs-ofctl -O OpenFlow13 dump-flows s1
 
-### Performance Test (iperf)
-```bash
+Expected output includes:
+
+priority=200,dl_src=<MAC> actions=drop
+Scenario 2: Normal vs Failure (Throughput Analysis)
+Step 1 — Clean Restart
+mininet> exit
+sudo mn -c
+
+Restart controller and topology
+
+Step 2 — Measure Normal Throughput
 mininet> h2 iperf -s &
-mininet> h3 iperf -c 10.0.0.2
-```
+mininet> h1 iperf -c 10.0.0.2 -t 10
 
----
+Expected result:
+Throughput around 90–100 Mbits/sec
 
-## Expected Output
+Step 3 — Trigger Host Blocking
+mininet> h3 ping -f h1 &
 
-### Controller Terminal (Terminal 1)
-[PKT] 46:e0:52:f1:74:77 -> 4e:38:14:be:a2:79 | count=20
-[PKT] 46:e0:52:f1:74:77 -> 4e:38:14:be:a2:79 | count=21
-*** BLOCKED HOST: 46:e0:52:f1:74:77 exceeded 20 packets ***
+Wait until controller logs indicate host is blocked
 
-### Flow Table After Blocking
-priority=200,dl_src=46:e0:52:f1:74:77 actions=drop
-priority=0 actions=CONTROLLER:65535
+Step 4 — Test Blocked Host Throughput
+mininet> h3 iperf -c 10.0.0.2 -t 5
 
----
+Expected result:
 
-## Evaluation Criteria Coverage
+0.00 Mbits/sec OR
+Connection failure
+Step 5 — Verify Normal Host Performance
+mininet> h1 iperf -c 10.0.0.2 -t 5
 
-| Component | What was demonstrated |
-|---|---|
-| Problem Understanding & Setup | Mininet topology, Ryu controller, OpenFlow 1.3 |
-| SDN Logic & Flow Rule Implementation | packet_in handler, match on eth_src, DROP action |
-| Functional Correctness | Normal ping works, flood gets blocked, verified with dump-flows |
-| Performance Observation | iperf bandwidth, ping latency, packet loss statistics |
-| Validation | h4 ping after blocking = 100% loss (regression test) |
+Expected result:
+Throughput remains 90–100 Mbits/sec
 
----
+Expected Outputs
+Controller Logs
+[PACKET] Host-X -> Host-Y | count=20
+[PACKET] Host-X -> Host-Y | count=21
 
-## References
-- Ryu SDN Framework: https://ryu.readthedocs.io
-- Mininet Walkthrough: http://mininet.org/walkthrough/
-- OpenFlow 1.3 Specification: https://opennetworking.org/wp-content/uploads/2014/10/openflow-spec-v1.3.0.pdf
-- faucetsdn/ryu GitHub: https://github.com/faucetsdn/ryu
+BLOCKED HOST: <MAC address>
+Flow Table
+priority=200,dl_src=<MAC> actions=drop
+priority=0 actions=CONTROLLER
+Code Structure
+Controller Implementation
+
+File: dynamic_blocker.py
+
+Features:
+
+Packet counting per host
+Threshold-based blocking
+Flow rule installation
+Logging and monitoring
+Network Topology
+
+File: topology.py
+
+Single switch topology
+Remote controller connection
+Four hosts configuration
+Results and Observations
+Normal traffic flows without interruption
+Flooding attack is detected quickly
+Malicious host is blocked automatically
+Other hosts remain unaffected
+Throughput remains stable for legitimate hosts
+Conclusion
+
+This project demonstrates how SDN can be used to implement real-time network security mechanisms. By separating the control plane from the data plane, the controller can dynamically enforce policies such as traffic blocking based on observed behavior.
+
+References
+Ryu Documentation: https://ryu.readthedocs.io
+Mininet Walkthrough: http://mininet.org/walkthrough/
+OpenFlow 1.3 Specification: https://opennetworking.org
+Ryu GitHub Repository: https://github.com/faucetsdn/ryu
